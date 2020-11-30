@@ -83,7 +83,7 @@ class Promise<T> {
     //---
 
     public static function resolve<T>(value: T): Promise<T> {
-        final promise: Promise<T> = new Promise<T>();
+        final promise = new Promise<T>();
 
         promise._resolve(value);
         
@@ -112,7 +112,7 @@ class Promise<T> {
     //---
 
     public static function race<T>(promises: Array<Promise<T>>): Promise<T> {
-        var newPromise = new Promise();
+        var newPromise = new Promise<T>();
 
         if (0 < promises.length) {
             for (promise in promises) {
