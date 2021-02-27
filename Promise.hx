@@ -1,29 +1,41 @@
+/**
+    @author sebavan
+    @author deltakosh
+
+    Port of https://github.com/BabylonJS/Babylon.js/blob/master/src/Misc/promise.ts
+**/
+
 package io.github.dimous.util;
 
 import haxe.Timer;
 import haxe.Exception;
 
-enum EPromiseStates {
+enum EPromiseState {
     PENDING;
     REJECTED;
     FULFILLED;
 }
 //---
 
-class FulfillmentAgregator<T> {
-    public var count: Int = 0;
-    public var target: Int = 0;
-    public final results: Array<Any> = [];
-    public var rootPromise: Null<Promise<T>> = null;
+class FulfillmentAggregator<T> {
+    public var count: Int;
+    public var target: Int;
+    public final results: Array<Any>;
+    public var rootPromise: Null<Promise<T>>;
 
-    public function new() {}
+    public function new() {
+        this.count = 0;
+        this.target = 0;
+        this.results = [];
+        this.rootPromise = null;
+    }
 }
 //---
 
 class Promise<T> {
     private var _reason: Any;
     private var _resultValue: Null<T>;
-    private var _state: EPromiseStates;
+    private var _state: EPromiseState;
     private var _rejectWasConsumed: Bool;
     private var _parent: Null<Promise<T>>;
     private var _result(get, set): Null<T>;
@@ -34,7 +46,7 @@ class Promise<T> {
     public function new(?resolver: (resolve: (?value: Null<T>) -> Void, reject: (resaon: Any) -> Void) -> Void) {
         this._children = [];
         this._rejectWasConsumed = false;
-        this._state = EPromiseStates.PENDING;
+        this._state = EPromiseState.PENDING;
 
         if (null != resolver) {
             try {
@@ -66,10 +78,10 @@ class Promise<T> {
 
         promise._parent = this;
 
-        if (EPromiseStates.PENDING != this._state) {
+        if (EPromiseState.PENDING != this._state) {
             Timer.delay(
                 () -> {
-                    if (EPromiseStates.FULFILLED == this._state || this._rejectWasConsumed) {
+                    if (EPromiseState.FULFILLED == this._state || this._rejectWasConsumed) {
                         promise._resolve(this._result);
                     } else {
                         promise._reject(this._reason);
@@ -94,14 +106,14 @@ class Promise<T> {
     public static function all<T>(promises: Array<Promise<T>>): Promise<Array<T>> {
         final length = promises.length;
         final promise = new Promise<Array<T>>();
-        final agregator = new FulfillmentAgregator<Array<T>>();
+        final aggregator = new FulfillmentAggregator<Array<T>>();
 
-        agregator.target = length;
-        agregator.rootPromise = promise;
+        aggregator.target = length;
+        aggregator.rootPromise = promise;
 
         if (0 < length) {
             for (index in 0...length) {
-                Promise._registerForFulfillment(promises[index], agregator, index);
+                Promise._registerForFulfillment(promises[index], aggregator, index);
             }
         } else {
             promise._resolve([]);
@@ -156,7 +168,7 @@ class Promise<T> {
         try {
             var promise = null;
             
-            this._state = EPromiseStates.FULFILLED;
+            this._state = EPromiseState.FULFILLED;
 
             if (null != this._onFulfilled) {
                 promise = this._onFulfilled(value);
@@ -191,7 +203,7 @@ class Promise<T> {
 
     private function _reject(reason: Any, onLocalThrow: Bool = false): Void {
         this._reason = reason;
-        this._state = EPromiseStates.REJECTED;
+        this._state = EPromiseState.REJECTED;
 
         if (null != this._onRejected && !onLocalThrow) {
             try {
@@ -223,31 +235,31 @@ class Promise<T> {
         for (child in this._children) {
             child._parent = this;
             
-            if (EPromiseStates.FULFILLED == this._state) {
+            if (EPromiseState.FULFILLED == this._state) {
                 child._resolve(this._result);
             } else
-                if (EPromiseStates.REJECTED == this._state) {
+                if (EPromiseState.REJECTED == this._state) {
                     child._reject(this._reason);
                 }
         }
     }
     //---
 
-    private static function _registerForFulfillment<T>(promise: Promise<T>, agregator: FulfillmentAgregator<Array<T>>, index: Int) {
+    private static function _registerForFulfillment<T>(promise: Promise<T>, aggregator: FulfillmentAggregator<Array<T>>, index: Int) {
         promise.then(
             (?value: Null<T>) -> {
-                agregator.results[index] = value;
-                agregator.count ++;
+                aggregator.results[index] = value;
+                aggregator.count ++;
 
-                if (agregator.count == agregator.target) {
-                    agregator.rootPromise._resolve(cast agregator.results);
+                if (aggregator.count == aggregator.target) {
+                    aggregator.rootPromise._resolve(cast aggregator.results);
                 }
 
                 return null;
             },
             (reason: Any) -> {
-                if (EPromiseStates.REJECTED != agregator.rootPromise._state) {
-                    agregator.rootPromise._reject(reason);
+                if (EPromiseState.REJECTED != aggregator.rootPromise._state) {
+                    aggregator.rootPromise._reject(reason);
                 }
             }
         );
